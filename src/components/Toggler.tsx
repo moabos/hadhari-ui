@@ -12,7 +12,7 @@ interface TogglerProps {
 function Toggler({
   labels,
   multi = false,
-  className = 'w-fit bg-neutral-300 p-1 border-2 border-black',
+  className = 'w-min md:w-fit bg-neutral-300 p-1 border-2 border-black text-center flex flex-col md:flex-row',
   buttonClass = 'px-4 text-black py-2 m-0.5 font-light transition duration-500 hover:cursor-pointer',
   selectedClass = 'bg-cyan-500 text-white',
   unselectedClass = '',

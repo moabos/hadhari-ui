@@ -5,7 +5,7 @@ interface SliderProps {
 
 function Slider({ value, onChange }: SliderProps) {
   return (
-    <div className="flex w-full flex-col items-center gap-2 border-4 border-black bg-yellow-100 p-6">
+    <div className="w-full gap-2 border-4 border-black bg-yellow-100 p-6 text-center">
       <input
         type="range"
         min={0}
