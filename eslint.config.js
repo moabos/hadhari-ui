@@ -41,6 +41,7 @@ export default [
       'prefer-arrow-callback': ['error', { allowNamedFunctions: true }],
       'no-async-promise-executor': 'error',
       'prefer-const': 'error',
+      '@typescript-eslint/no-misused-promises': 'off',
     },
   },
 ];

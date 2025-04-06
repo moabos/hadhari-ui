@@ -57,7 +57,7 @@ async function getMessages(
     }
 
     const messages = snapshot.docs.map((doc) => {
-      const { sender_number, raw_message, prediction, confidence, validated } = doc.data(); // Destructure doc.data()
+      const { sender_number, raw_message, prediction, confidence, validated } = doc.data();
 
       const msg: Message = {
         id: doc.id,

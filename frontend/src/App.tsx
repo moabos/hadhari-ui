@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { LastDoc, Message, StatsBarProps, ActionMessage, Prediction } from '../../shared/types';
 import Controls from './components/Controls';
 import MessageCard from './components/MessageCard';
@@ -26,9 +26,27 @@ function App() {
   const [batchToWrite, setBatchToWrite] = useState<ActionMessage[]>([]);
   const [sessionValidated, setSessionValidated] = useState<number>(0);
 
-  const fetchStats = async () => {
+  useEffect(() => {
+    fetchStats()
+      .then(setStats)
+      .catch((err) => console.error('Error fetching stats:', err));
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code === 'Space' && messages.length === 0 && batchToWrite.length > 0) {
+        event.preventDefault();
+        void handleWriteAndFetch();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [messages.length, batchToWrite.length, lastDoc]);
+
+  const fetchStats = async (): Promise<StatsBarProps> => {
     const res = await fetch('http://localhost:3000/api/message_counts');
-    return res.json() as Promise<StatsBarProps>;
+    return (await res.json()) as StatsBarProps;
   };
 
   const fetchMessages = async (reset = false, lastDoc?: LastDoc) => {
@@ -53,20 +71,16 @@ function App() {
         }),
       });
 
-      if (!res.ok) {
-        throw new Error(`Server error: ${res.statusText}`);
-      }
+      if (!res.ok) throw new Error(`Server error: ${res.statusText}`);
 
       const data = (await res.json()) as { messages: Message[]; lastDoc?: LastDoc };
 
-      if (data.messages.length === 0) {
-        return;
+      if (data.messages.length > 0) {
+        setMessages((prev) => (reset ? data.messages : [...prev, ...data.messages]));
+        setLastDoc(data.lastDoc);
       }
-
-      setMessages((prev) => (reset ? data.messages : [...prev, ...data.messages]));
-      setLastDoc(data.lastDoc);
-    } catch (error) {
-      console.error('Failed to fetch messages:', error);
+    } catch (err) {
+      console.error('Failed to fetch messages:', err);
     } finally {
       setIsLoading(false);
     }
@@ -80,11 +94,9 @@ function App() {
         body: JSON.stringify(batch),
       });
 
-      if (!res.ok) {
-        throw new Error(`Server error: ${res.statusText}`);
-      }
-    } catch (error) {
-      console.error('Failed to write batch:', error);
+      if (!res.ok) throw new Error(`Server error: ${res.statusText}`);
+    } catch (err) {
+      console.error('Failed to write batch:', err);
     }
   };
 
@@ -93,50 +105,31 @@ function App() {
     await fetchMessages(true);
   };
 
-  useEffect(() => {
-    fetchStats()
-      .then((fetchedStats) => {
-        setStats(fetchedStats);
-      })
-      .catch((err) => {
-        console.error('Error fetching stats:', err);
-      });
-  }, []);
-
-  const handleDelete = () => {
-    setBatchToWrite((prev) => [
-      ...prev,
-      { message: messages[0], action: 'delete' } as ActionMessage,
-    ]);
-    setMessages(messages.slice(1));
-    setSessionValidated(sessionValidated + 1);
+  const handleWriteAndFetch = async () => {
+    const batchCopy = [...batchToWrite];
+    setBatchToWrite([]);
+    await writeBatch(batchCopy);
+    await fetchMessages(false, lastDoc);
   };
 
-  useEffect(() => {
-    if (messages.length === 0 && batchToWrite.length > 0) {
-      const batchCopy = [...batchToWrite];
-      setBatchToWrite([]);
-      void writeBatch(batchCopy);
-      const fetchMessagesAsync = async () => {
-        await fetchMessages(false, lastDoc as LastDoc);
-      };
-      void fetchMessagesAsync();
-    }
-  }, [messages.length]);
+  const handleDelete = () => {
+    setBatchToWrite((prev) => [...prev, { message: messages[0], action: 'delete' }]);
+    setMessages(messages.slice(1));
+    setSessionValidated((prev) => prev + 1);
+  };
 
   const handleValidate = (label: Prediction) => {
     setBatchToWrite((prev) => [
       ...prev,
-      { message: messages[0], action: 'validate', validation: label } as ActionMessage,
+      { message: messages[0], action: 'validate', validation: label },
     ]);
     setMessages(messages.slice(1));
-    setSessionValidated(sessionValidated + 1);
+    setSessionValidated((prev) => prev + 1);
   };
 
   const handleNext = () => {
     setMessages((prev) => {
       if (prev.length === 0) return prev;
-
       const [first, ...rest] = prev;
       return [...rest, first];
     });
@@ -149,6 +142,7 @@ function App() {
           Hadhari Validation Interface
         </h1>
       </header>
+
       <StatsBar
         spam={stats.spam}
         ham={stats.ham}
@@ -159,84 +153,75 @@ function App() {
       {submitted ? (
         <>
           <h1 className="text-2xl font-bold">Messages</h1>
+
           {isLoading ? (
             <p className="animate-pulse text-gray-500">Loading messages...</p>
-          ) : messages.length > 0 ? (
+          ) : (
             <div className="max-w-11/12 flex flex-col items-center gap-2">
-              <MessageCard key={messages[0].id} message={messages[0]} type="active" />
-              <Controls
-                message={messages[0]}
-                onDelete={handleDelete}
-                onValidate={handleValidate}
-                onNext={handleNext}
-              />
+              {messages[0] && (
+                <MessageCard key={messages[0].id} message={messages[0]} type="active" />
+              )}
+
+              {messages.length === 0 && batchToWrite.length > 0 ? (
+                <button
+                  onClick={handleWriteAndFetch}
+                  className="border-4 border-gray-500 bg-black px-4 py-2 text-white hover:cursor-pointer hover:bg-slate-600"
+                >
+                  Write and get next batch (<span className="font-mono font-bold">Space</span>)
+                </button>
+              ) : (
+                messages[0] && (
+                  <Controls
+                    message={messages[0]}
+                    onDelete={handleDelete}
+                    onValidate={handleValidate}
+                    onNext={handleNext}
+                  />
+                )
+              )}
+
               <div className="h-4 w-full bg-black"></div>
+
               {batchToWrite.map((actionMessage) => (
-                <>
-                  <MessageCard key={actionMessage.message.id} message={actionMessage.message} />
+                <Fragment key={actionMessage.message.id}>
+                  <MessageCard message={actionMessage.message} />
                   <Toggler
                     labels={['DELETE', 'Spam', 'Ham']}
                     selected={
                       actionMessage.action === 'delete' ? 'DELETE' : actionMessage.validation
                     }
                     onChange={(selected) => {
-                      if (selected === 'DELETE') {
-                        setBatchToWrite((prev) =>
-                          prev.map((item) =>
-                            item.message.id === actionMessage.message.id
-                              ? {
-                                  ...item,
-                                  action: 'delete',
-                                }
-                              : item
-                          )
-                        );
-                      } else {
-                        const prediction = selected as Prediction;
-                        setBatchToWrite((prev) =>
-                          prev.map((item) =>
-                            item.message.id === actionMessage.message.id
-                              ? {
+                      setBatchToWrite((prev) =>
+                        prev.map((item) =>
+                          item.message.id === actionMessage.message.id
+                            ? selected === 'DELETE'
+                              ? { ...item, action: 'delete' }
+                              : {
                                   ...item,
                                   action: 'validate',
-                                  validation: prediction,
+                                  validation: selected as Prediction,
                                 }
-                              : item
-                          )
-                        );
-                      }
+                            : item
+                        )
+                      );
                     }}
                   />
-                </>
+                </Fragment>
               ))}
+
               <div className="h-4 w-full bg-black"></div>
+
               {messages.slice(1).map((message) => (
                 <MessageCard key={message.id} message={message} />
               ))}
             </div>
-          ) : (
-            <button
-              onClick={() => {
-                void (async () => {
-                  await fetchMessages(false, lastDoc);
-                })();
-              }}
-            >
-              {'Write and get next batch'}
-            </button>
           )}
         </>
       ) : (
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            void (async () => {
-              try {
-                await handleFormSubmit();
-              } catch (err) {
-                console.error('Error during form submission:', err);
-              }
-            })();
+            void handleFormSubmit();
           }}
           className="lg:max-w-1/2 relative mb-auto mt-0.5 grid w-10/12 grid-cols-2 border-4 border-black bg-slate-50 py-10 text-sm font-bold uppercase tracking-wide text-amber-500 md:w-11/12 md:gap-5 md:p-10"
         >
@@ -286,5 +271,4 @@ function App() {
     </>
   );
 }
-
 export default App;
