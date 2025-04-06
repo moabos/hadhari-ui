@@ -1,0 +1,8 @@
+packages:
+  - frontend
+  - backend
+onlyBuiltDependencies:
+  - '@firebase/util'
+  - '@swc/core'
+  - esbuild
+  - protobufjs

@@ -26,9 +26,12 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
 
+    "esModuleInterop": true,
     "baseUrl": "./",
-    
-
+    "paths": {
+      "@frontend/*": ["frontend/src/*"],
+      "@backend/*": ["api/src/*"]
+    }
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["frontend/src", "api/src", "**/*.ts", "**/*.tsx", "frontend/tsconfig.json"]
 }

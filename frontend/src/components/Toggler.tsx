@@ -5,7 +5,7 @@ interface TogglerProps {
   buttonClass?: string;
   selectedClass?: string;
   unselectedClass?: string;
-  selected: string | string[];
+  selected: string | string[] | undefined;
   onChange: (selected: string[] | string) => void;
 }
 
